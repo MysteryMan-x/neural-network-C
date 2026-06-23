@@ -1,2 +1,4 @@
 # neural-network-C
-A C language-based neural network framework that currently includes fully connected layers. It supports forward propagation for inference and backward propagation for training. Uses tensors to implement various functions, making it suitable for beginners learning AI.
+
+基于C语言的神经网络框架,目前包含全连接层。支持前向传播推理和反向传播训练。使用tensor实现各种功能，适合人工智能入门学习。
+
