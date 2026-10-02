@@ -3,7 +3,7 @@
 tensor_handle tensor_sigmoid(tensor_handle t)
 {
 	tensor_handle out = create_tensor(t->dim, t->h, t->w, zero, t->req_grad);
-	for (int i = 0; i < t->h * t->w; i++) {
+	for (int i = 0; i < t->dim * t->h * t->w; i++) {
 		float x = t->Data[i];
 		out->Data[i] = 1.0f / (1.0f + exp(-x));
 	}
@@ -13,8 +13,8 @@ tensor_handle tensor_sigmoid(tensor_handle t)
 tensor_handle tensor_sigmoid_grad(tensor_handle grad, tensor_handle output)
 {
 	tensor_handle out = create_tensor(grad->dim, grad->h, grad->w, zero, grad->req_grad);
-	for (int i = 0; i < grad->h * grad->w; i++) {
-		float s = output->Data[i];
+	for (int i = 0; i < grad->dim * grad->h * grad->w; i++) {
+		float s = 1.0f / (1.0f + exp(-output->Data[i])); /* s = sigmoid(激活前的 x) */
 		out->Data[i] = grad->Data[i] * s * (1.0f - s); 
 	}
 	return out;
@@ -23,7 +23,7 @@ tensor_handle tensor_sigmoid_grad(tensor_handle grad, tensor_handle output)
 tensor_handle tensor_relu(tensor_handle t)
 {
 	tensor_handle out = create_tensor(t->dim, t->h, t->w, zero, t->req_grad);
-	for (int i = 0; i < t->h * t->w; i++) {
+	for (int i = 0; i < t->dim * t->h * t->w; i++) {
 		out->Data[i] = t->Data[i] > 0 ? t->Data[i] : 0;
 	}
 	return out;
@@ -32,7 +32,7 @@ tensor_handle tensor_relu(tensor_handle t)
 tensor_handle tensor_relu_grad(tensor_handle grad, tensor_handle output)
 {
 	tensor_handle out = create_tensor(grad->dim, grad->h, grad->w, zero, grad->req_grad);
-	for (int i = 0; i < grad->h * grad->w; i++) {
+	for (int i = 0; i < grad->dim * grad->h * grad->w; i++) {
 		out->Data[i] = output->Data[i] > 0 ? grad->Data[i] : 0;
 	}
 	return out;
