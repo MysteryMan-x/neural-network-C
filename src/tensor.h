@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define LIMIT 0.1
+
 typedef float tensor_data_type;
 
 typedef enum create_tensor_mode
