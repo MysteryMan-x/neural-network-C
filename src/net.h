@@ -8,7 +8,8 @@ typedef enum layer_type
 {
 	fc = 0,
 	conv2d,
-	pool
+	pool,
+	flatten
 }layer_type;
 
 typedef struct FC
@@ -26,7 +27,7 @@ typedef struct CONV2D
 {
 	layer_type type;
 	
-	unsigned int output_dim;
+	unsigned int kernelnum;
 	unsigned int kernel_size;
 	unsigned int stride;
 	unsigned int padding;
@@ -45,6 +46,11 @@ typedef struct POOL
 	
 }POOL;
 
+typedef struct FLATTEN
+{
+	layer_type type;
+}FLATTEN;
+
 typedef struct layer_list
 {
 	layer_type type;
@@ -55,6 +61,7 @@ typedef struct layer_list
 		FC* fclayer;
 		CONV2D* conv2dlayer;
 		POOL* poollayer;
+		FLATTEN* flattenlayer;
 	}data;
 	tensor* output;
 	
@@ -76,8 +83,13 @@ typedef struct net
 
 net_handle create_net();//新建一个网络
 void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,actifun_type actifun);//给网络增加全连接层
-void add_conv2d_layer(net_handle NET,unsigned int outputdim,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun);//给网络增加卷积层
+void add_conv2d_layer(net_handle NET,unsigned int kernelnum,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun);//给网络增加卷积层
+void add_pool_layer(net_handle NET,unsigned int poolsize);//给网络末尾增加最大池化层; poolsize 是池化窗大小(同时作为步长), 输出尺寸=输入/poolsize(向下取整)
+void add_flatten_layer(net_handle NET);//给网络末尾增加展平层; 把 (dim,h,w) 张量拉成 (1,1,dim*h*w), 用于连接卷积/池化层与全连接层
 tensor_handle fc_forward(FC* layer,tensor_handle input);//全连接层前向传播
+tensor_handle conv2d_forward(CONV2D* layer,tensor_handle input);//卷积层前向传播
+tensor_handle pool_forward(POOL* layer,tensor_handle input);//最大池化前向: 每 poolsize×poolsize 窗取最大值, 并把最大值位置记入 layer->mask 供反向用
+tensor_handle flatten_forward(tensor_handle input);//展平前向: (dim,h,w) → (1,1,dim*h*w)
 void forward(net_handle NET,tensor_handle input);//网络前向传播
 float compute_lose(net_handle NET,lose_func FUN,tensor_handle ture_val);//计算损失
 tensor_handle fc_backward(FC* layer, tensor* output_grad, tensor* input);//全连接层反向传播
