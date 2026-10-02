@@ -29,7 +29,7 @@ tensor_handle create_tensor(unsigned int dim,unsigned int h,unsigned int w,creat
 			srand((unsigned int)time(NULL));
 			for(i = 0;i<(w*h*dim);i++)
 			{
-				ret->Data[i] = (float)(((float)rand()/(float)RAND_MAX)*0.01);
+				ret->Data[i] = (2.0f * ((float)rand() / (float)RAND_MAX) - 1.0f) * LIMIT;
 			}
 			break;
 		case zero:
@@ -157,7 +157,7 @@ tensor_handle tensor_matrix_mul(tensor_handle tensorA, tensor_handle tensorB)
 	
 	if (tensorA->w != tensorB->h)
 	{
-		printf("tensor can not mul! A.w != B.h(tensor_matrix_mul)\n");
+		printf("tensor can not mul! A.w != B.h A.w = %d,B.h = %d(tensor_matrix_mul)\n",tensorA->w,tensorB->h);
 		return NULL;
 	}
 	
@@ -361,7 +361,7 @@ tensor_handle tensor_padding(tensor_handle tensorpad,unsigned int size,create_te
 		{
 			for(k = 0;k<w;k++)
 			{
-				ret->Data[((i*(h+2*size)*(w+2*size))+((j+1)*(w+2*size))+(k+1))] = tensorpad->Data[((i*h*w)+(j*w)+k)];
+				ret->Data[((i*(h+2*size)*(w+2*size))+((j+size)*(w+2*size))+(k+size))] = tensorpad->Data[((i*h*w)+(j*w)+k)];
 			}
 		}
 	}
