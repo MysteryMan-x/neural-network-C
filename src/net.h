@@ -27,6 +27,7 @@ typedef struct CONV2D
 {
 	layer_type type;
 	
+	unsigned int Cin;
 	unsigned int kernelnum;
 	unsigned int kernel_size;
 	unsigned int stride;
@@ -83,7 +84,7 @@ typedef struct net
 
 net_handle create_net();//新建一个网络
 void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,actifun_type actifun);//给网络增加全连接层
-void add_conv2d_layer(net_handle NET,unsigned int kernelnum,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun);//给网络增加卷积层
+void add_conv2d_layer(net_handle NET,unsigned int Cin,unsigned int kernelnum,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun);//给网络增加卷积层
 void add_pool_layer(net_handle NET,unsigned int poolsize);//给网络末尾增加最大池化层; poolsize 是池化窗大小(同时作为步长), 输出尺寸=输入/poolsize(向下取整)
 void add_flatten_layer(net_handle NET);//给网络末尾增加展平层; 把 (dim,h,w) 张量拉成 (1,1,dim*h*w), 用于连接卷积/池化层与全连接层
 tensor_handle fc_forward(FC* layer,tensor_handle input);//全连接层前向传播
@@ -98,4 +99,3 @@ void optimizer(net_handle NET, float lr);//优化器
 void net_zero_grad(net_handle NET);//清零网络梯度
 
 #endif 
-
