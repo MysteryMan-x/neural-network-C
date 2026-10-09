@@ -65,7 +65,7 @@ void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,ac
 	return;
 }
 
-void add_conv2d_layer(net_handle NET,unsigned int kernelnum,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun)
+void add_conv2d_layer(net_handle NET,unsigned int Cin,unsigned int kernelnum,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun)
 {
 	if(NET == NULL)
 	{
@@ -75,12 +75,13 @@ void add_conv2d_layer(net_handle NET,unsigned int kernelnum,unsigned int kernels
 	CONV2D* conv2dlayer = (CONV2D*)malloc(sizeof(CONV2D));
 	layer_list* node = (layer_list*)malloc(sizeof(layer_list));
 	conv2dlayer->type = conv2d;
+	conv2dlayer->Cin = Cin;
 	conv2dlayer->kernelnum = kernelnum;
 	conv2dlayer->kernel_size = kernelsize;
 	conv2dlayer->stride = stride;
 	conv2dlayer->padding = padding;
-	conv2dlayer->kernel_w = create_tensor(kernelnum,kernelsize,kernelsize,random,grad);
-	conv2dlayer->kernel_b = NULL;
+	conv2dlayer->kernel_w = create_tensor(kernelnum,Cin,kernelsize*kernelsize,random,grad);
+	conv2dlayer->kernel_b = NULL; 
 	
 	node->data.conv2dlayer = conv2dlayer;
 	node->input = NULL;
@@ -219,7 +220,7 @@ tensor_handle conv2d_forward(CONV2D* layer,tensor_handle input)
 	
 	unsigned int out_h = (p_h - ksize) / str + 1;
 	unsigned int out_w = (p_w - ksize) / str + 1;
-	unsigned int out_dim = Cin * Knum;
+	unsigned int out_dim = Knum;
 	
 	if(layer->kernel_b == NULL || layer->kernel_b->w != out_dim)
 	{
@@ -230,16 +231,15 @@ tensor_handle conv2d_forward(CONV2D* layer,tensor_handle input)
 	
 	tensor_handle ret = create_tensor(out_dim, out_h, out_w, zero, nograd);
 	
-	for(unsigned int c = 0;c < Cin;c++)
+	for(unsigned int k = 0;k < Knum;k++) 
 	{
-		for(unsigned int kn = 0;kn < Knum;kn++)
+		for(unsigned int j = 0;j < out_h;j++)
 		{
-			unsigned int o = c * Knum + kn;
-			for(unsigned int j = 0;j < out_h;j++)
+			for(unsigned int i = 0;i < out_w;i++)
 			{
-				for(unsigned int i = 0;i < out_w;i++)
+				float sum = 0.0f;
+				for(unsigned int c = 0;c < Cin;c++) 
 				{
-					float sum = 0.0f;
 					for(unsigned int l = 0;l < ksize;l++)
 					{
 						for(unsigned int m = 0;m < ksize;m++)
@@ -247,12 +247,12 @@ tensor_handle conv2d_forward(CONV2D* layer,tensor_handle input)
 							unsigned int ph = j * str + l; 
 							unsigned int pw = i * str + m;
 							float in_val = padded->Data[c * p_h * p_w + ph * p_w + pw]; 
-							float w_val = layer->kernel_w->Data[kn * ksize * ksize + l * ksize + m]; 
+							float w_val = layer->kernel_w->Data[k * Cin * ksize * ksize + c * ksize * ksize + l * ksize + m]; 
 							sum += in_val * w_val;
 						}
 					}
-					ret->Data[o * out_h * out_w + j * out_w + i] = sum + layer->kernel_b->Data[o]; 
 				}
+				ret->Data[k * out_h * out_w + j * out_w + i] = sum + layer->kernel_b->Data[k]; 
 			}
 		}
 	}
@@ -400,32 +400,28 @@ tensor_handle conv2d_backward(CONV2D* layer, tensor_handle delta, tensor_handle 
 	
 	tensor_handle padded_grad = create_tensor(Cin, p_h, p_w, zero, nograd);
 	
-	tensor_zero_grad(layer->kernel_w);
-	tensor_zero_grad(layer->kernel_b);
-	
-	for(unsigned int c = 0;c < Cin;c++)
+	for(unsigned int k = 0;k < Knum;k++) 
 	{
-		for(unsigned int kn = 0;kn < Knum;kn++)
+		for(unsigned int j = 0;j < out_h;j++)
 		{
-			unsigned int o = c * Knum + kn;
-			for(unsigned int j = 0;j < out_h;j++)
+			for(unsigned int i = 0;i < out_w;i++)
 			{
-				for(unsigned int i = 0;i < out_w;i++)
+				float d = delta->Data[k * out_h * out_w + j * out_w + i];
+				layer->kernel_b->grad[k] += d;
+				for(unsigned int c = 0;c < Cin;c++)
 				{
-					float d = delta->Data[o * out_h * out_w + j * out_w + i]; 
-					layer->kernel_b->grad[o] += d; 
 					for(unsigned int l = 0;l < ksize;l++)
 					{
 						for(unsigned int m = 0;m < ksize;m++)
 						{
-							unsigned int w_idx = kn * ksize * ksize + l * ksize + m; 
+							unsigned int w_idx = k * Cin * ksize * ksize + c * ksize * ksize + l * ksize + m;
 							unsigned int ph = j * str + l; 
 							unsigned int pw = i * str + m;
-							float in_val = padded->Data[c * p_h * p_w + ph * p_w + pw]; 
+							float in_val = padded->Data[c * p_h * p_w + ph * p_w + pw];
 							
-							layer->kernel_w->grad[w_idx] += in_val * d; 
+							layer->kernel_w->grad[w_idx] += in_val * d;
 							
-							padded_grad->Data[c * p_h * p_w + ph * p_w + pw] += layer->kernel_w->Data[w_idx] * d; 
+							padded_grad->Data[c * p_h * p_w + ph * p_w + pw] += layer->kernel_w->Data[w_idx] * d;
 						}
 					}
 				}
@@ -440,7 +436,7 @@ tensor_handle conv2d_backward(CONV2D* layer, tensor_handle delta, tensor_handle 
 		{
 			for(unsigned int i = 0;i < in_w;i++)
 			{
-				input_grad->Data[c * in_h * in_w + j * in_w + i] = padded_grad->Data[c * p_h * p_w + (j + pad) * p_w + (i + pad)]; 
+				input_grad->Data[c * in_h * in_w + j * in_w + i] = padded_grad->Data[c * p_h * p_w + (j + pad) * p_w + (i + pad)];
 			}
 		}
 	}
@@ -474,7 +470,7 @@ tensor_handle pool_backward(POOL* layer, tensor_handle delta, tensor_handle inpu
 				unsigned int idx = (unsigned int)layer->mask->Data[c*out_h*out_w + j*out_w + i];
 				unsigned int l = idx / ps;
 				unsigned int m = idx % ps;
-				input_grad->Data[c*in_h*in_w + (j*ps+l)*in_w + (i*ps+m)] = delta->Data[c*out_h*out_w + j*out_w + i]; /* 把误差放回窗口内最大值位置 (j*ps+l, i*ps+m) */
+				input_grad->Data[c*in_h*in_w + (j*ps+l)*in_w + (i*ps+m)] = delta->Data[c*out_h*out_w + j*out_w + i]; 
 			}
 		}
 	}
@@ -653,4 +649,3 @@ void net_zero_grad(net_handle NET)
 		p = p->next;
 	}
 }
-
