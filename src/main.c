@@ -6,7 +6,7 @@
 
 /* ================= 可调参数 ================= */
 #define EPOCHS             2        /* 训练轮数 */
-#define LR                 0.05f    /* 学习率 */
+#define LR                 0.01f    /* 学习率 */
 #define TRAIN_PRINT_EVERY  100     /* 训练时每多少个样本打印一次进度 */
 #define IMG_ROWS           28
 #define IMG_COLS           28
@@ -139,13 +139,14 @@ int main(void)
 	
 	printf("\n==== 构建网络 ====\n");
 	net_handle net = create_net();
-	add_conv2d_layer(net, 8, 3, 1, 1, relu);   /* 28x28x1 -> 28x28x8  */
-	add_pool_layer(net, 2);                     /* -> 14x14x8         */
-	add_conv2d_layer(net, 16, 3, 1, 1, relu);  /* -> 14x14x128         */
-	add_pool_layer(net, 2);                     /* -> 7x7x128         */
-	add_flatten_layer(net);                     /* -> 6272            */
-	add_fc_layer(net, 6272, 256, relu);          /* -> 256              */
-	add_fc_layer(net, 256, 10, none);            /* -> 10              */
+	add_conv2d_layer(net, 1, 64, 3, 1, 1, relu);   /* 28x28x1 -> 28x28x64  */
+	add_pool_layer(net, 2);                     /* -> 14x14x64         */
+	add_conv2d_layer(net, 64, 32, 3, 1, 1, relu);  /* -> 14x14x32         */
+	add_pool_layer(net, 2);                     /* -> 7x7x32         */
+	add_flatten_layer(net);                     /* -> 1568            */
+	add_fc_layer(net, 7*7*32, 512, relu);       /* -> 512              */
+	add_fc_layer(net, 512, 64, relu);          /* -> 64              */
+	add_fc_layer(net, 64, 10, none);           /* -> 10              */
 	printf("网络构建完成, 共 %u 层\n", net->layernum);
 	
 	/* 复用输入/目标张量, 避免每次训练都重新 malloc */
@@ -210,4 +211,3 @@ int main(void)
 	printf("\n训练测试结束。\n");
 	return 0;
 }
-
