@@ -65,6 +65,65 @@ void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,ac
 	return;
 }
 
+void add_fc_layer_with_params(net_handle NET,unsigned int inputnum,unsigned int outputnum,actifun_type actifun,void* paramsw,void* paramsb)
+{
+	if(NET == NULL)
+	{
+		printf("net not init!(add_fc_layer)\r\n");
+		return;
+	}
+	FC* fclayer = (FC*)malloc(sizeof(FC));
+	layer_list* node = (layer_list*)malloc(sizeof(layer_list));
+	fclayer->type = fc;
+	fclayer->input_node_num = inputnum;
+	fclayer->output_node_num = outputnum;
+	fclayer->layer_w_tensor = create_tensor(1,inputnum,outputnum,random1,grad);
+	fclayer->layer_b_tensor = create_tensor(1,1,outputnum,random1,grad);
+
+	fclayer->layer_w_tensor = create_tensor_from_twodim_arr(inputnum,outputnum,grad,paramsw);
+	fclayer->layer_b_tensor = create_tensor_from_twodim_arr(1,outputnum,grad,paramsb);
+	
+	node->data.fclayer = fclayer;
+	node->input = NULL;
+	node->output = NULL;
+	node->actioutput = NULL;
+	node->type = fc;
+	switch (actifun)
+	{
+		case relu:
+			node->FUN = tensor_relu;
+			node->dFUN = tensor_relu_grad;
+			break;
+		case sigmoid:
+			node->FUN = tensor_sigmoid;
+			node->dFUN = tensor_sigmoid_grad;
+			break;
+		case none:
+			node->FUN = NULL;
+			node->dFUN = NULL;
+			break;
+		default:
+			node->FUN = NULL;
+			node->dFUN = NULL;
+			break;
+	}
+	if(NET->layer_fount == NULL)
+	{
+		NET->layer_fount = node;
+		NET->layer_tail = node;
+		node->pre = NULL;
+		node->next = NULL;
+		NET->layernum++;
+		return;
+	}
+	node->next = NULL;
+	node->pre = NET->layer_tail;
+	NET->layer_tail->next = node;
+	NET->layer_tail = node;
+	NET->layernum++;
+	return;
+}
+
 void add_conv2d_layer(net_handle NET,unsigned int Cin,unsigned int kernelnum,unsigned int kernelsize,unsigned int stride,unsigned int padding,actifun_type actifun)
 {
 	if(NET == NULL)
