@@ -7,6 +7,10 @@
 /* ================= 可调参数 ================= */
 #define EPOCHS             2        /* 训练轮数 */
 #define LR                 0.01f    /* 学习率 */
+#define BATCH_SIZE         32       /* 每批累加的样本数，必须大于 0 */
+#if BATCH_SIZE < 1
+#error BATCH_SIZE must be positive
+#endif
 #define TRAIN_PRINT_EVERY  100     /* 训练时每多少个样本打印一次进度 */
 #define IMG_ROWS           28
 #define IMG_COLS           28
@@ -44,7 +48,8 @@ static int load_images(const char* path, unsigned char** out_pixels,
 		fclose(f);
 		return -2;
 	}
-	unsigned int n = count * rows * cols;
+	if (!count || rows != IMG_ROWS || cols != IMG_COLS || count > 0xffffffffu/IMG_SIZE) { fclose(f); return -3; }
+	size_t n=(size_t)count*rows*cols;
 	unsigned char* buf = (unsigned char*)malloc(n);
 	if(buf == NULL || fread(buf, 1, n, f) != n)
 	{
@@ -122,22 +127,27 @@ int main(void)
 {
 	unsigned char *train_img = NULL, *train_lbl = NULL;
 	unsigned char *test_img  = NULL, *test_lbl  = NULL;
-	unsigned int train_n = 0, test_n = 0, rows = 0, cols = 0;
+	unsigned int train_n = 0, test_n = 0, rows = 0, cols = 0, label_n = 0;
 	
 	printf("==== 读取 MNIST 数据集 ====\n");
-	if(load_images("train-images-idx3-ubyte", &train_img, &train_n, &rows, &cols) != 0) return 1;
-	if(load_labels("train-labels-idx1-ubyte", &train_lbl, &train_n) != 0) return 1;
-	if(load_images("t10k-images-idx3-ubyte", &test_img, &test_n, &rows, &cols) != 0) return 1;
-	if(load_labels("t10k-labels-idx1-ubyte", &test_lbl, &test_n) != 0) return 1;
+	if(load_images("train-images-idx3-ubyte", &train_img, &train_n, &rows, &cols) != 0) goto cleanup;
+	if(load_labels("train-labels-idx1-ubyte", &train_lbl, &label_n) != 0) goto cleanup;
+	if (label_n != train_n || rows != IMG_ROWS || cols != IMG_COLS) goto cleanup;
+	if(load_images("t10k-images-idx3-ubyte", &test_img, &test_n, &rows, &cols) != 0) goto cleanup;
+	if(load_labels("t10k-labels-idx1-ubyte", &test_lbl, &label_n) != 0) goto cleanup;
 	
+    if (label_n != test_n) goto cleanup;
+    for(unsigned int j=0;j<train_n;j++) if(train_lbl[j]>=N_CLASSES) goto cleanup;
+    for(unsigned int j=0;j<test_n;j++) if(test_lbl[j]>=N_CLASSES) goto cleanup;
 	if(rows != IMG_ROWS || cols != IMG_COLS)
 	{
 		printf("[错误] 图像尺寸是 %ux%u, 本程序按 28x28 处理\n", rows, cols);
-		return 1;
+		goto cleanup;
 	}
 	printf("训练集 %u 张, 测试集 %u 张, 图像 %ux%u\n", train_n, test_n, rows, cols);
 	
 	printf("\n==== 构建网络 ====\n");
+	srand(12345); // 统一初始化随机种子
 	net_handle net = create_net();
 	add_conv2d_layer(net, 1, 64, 3, 1, 1, relu);   /* 28x28x1 -> 28x28x64  */
 	add_pool_layer(net, 2);                     /* -> 14x14x64         */
@@ -160,6 +170,8 @@ int main(void)
 		float loss_sum = 0.0f;
 		unsigned int correct = 0;
 		unsigned int i;
+		unsigned int batch_count = 0;
+		net_zero_grad(net);
 		
 		for(i = 0; i < train_n; i++)
 		{
@@ -171,7 +183,14 @@ int main(void)
 			if(argmax(net->layer_tail->output->Data, N_CLASSES) == (int)train_lbl[i])
 				correct++;
 			backward(net, MSE_d, y);
-			optimizer(net, LR);
+			batch_count++;
+			if((i + 1) % BATCH_SIZE == 0 || i + 1 == train_n)
+			{
+				/* 对累加梯度取平均；最后不足一批也按实际数量更新。 */
+				optimizer(net, LR / (float)batch_count);
+				net_zero_grad(net);
+				batch_count = 0;
+			}
 			
 			if((i + 1) % TRAIN_PRINT_EVERY == 0)
 			{
@@ -205,9 +224,14 @@ int main(void)
 	free(train_lbl);
 	free(test_img);
 	free(test_lbl);
+	remove_net(net);
 	remove_tensor(x);
 	remove_tensor(y);
 	
 	printf("\n训练测试结束。\n");
 	return 0;
+cleanup:
+    fprintf(stderr,"invalid or incomplete MNIST dataset\n");
+    free(train_img); free(train_lbl); free(test_img); free(test_lbl);
+    return 1;
 }

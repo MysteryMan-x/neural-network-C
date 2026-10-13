@@ -26,7 +26,6 @@ tensor_handle create_tensor(unsigned int dim,unsigned int h,unsigned int w,creat
 	switch (mode)
 	{
 		case random:
-			srand((unsigned int)time(NULL));
 			for(i = 0;i<(w*h*dim);i++)
 			{
 				ret->Data[i] = (2.0f * ((float)rand() / (float)RAND_MAX) - 1.0f) * LIMIT;

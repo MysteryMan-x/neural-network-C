@@ -82,6 +82,7 @@ typedef struct net
 	unsigned int layernum;
 }net,*net_handle;
 
+net_handle remove_net(net_handle NET); // 输入张量由调用者释放
 net_handle create_net();//新建一个网络
 void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,actifun_type actifun);//给网络增加全连接层
 void add_fc_layer_with_params(net_handle NET,unsigned int inputnum,unsigned int outputnum,actifun_type actifun,void* paramsw,void* paramsb);//使用已有参数给网络增加全连接层

@@ -1,4 +1,5 @@
 #include "net.h"
+#include <limits.h>
 
 net_handle create_net()
 {
@@ -16,6 +17,7 @@ void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,ac
 		printf("net not init!(add_fc_layer)\r\n");
 		return;
 	}
+	if (!inputnum || !outputnum) return;
 	FC* fclayer = (FC*)malloc(sizeof(FC));
 	layer_list* node = (layer_list*)malloc(sizeof(layer_list));
 	fclayer->type = fc;
@@ -67,7 +69,7 @@ void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,ac
 
 void add_fc_layer_with_params(net_handle NET,unsigned int inputnum,unsigned int outputnum,actifun_type actifun,void* paramsw,void* paramsb)
 {
-	if(NET == NULL)
+	if(NET == NULL || !paramsw || !paramsb || !inputnum || !outputnum)
 	{
 		printf("net not init!(add_fc_layer)\r\n");
 		return;
@@ -77,8 +79,6 @@ void add_fc_layer_with_params(net_handle NET,unsigned int inputnum,unsigned int 
 	fclayer->type = fc;
 	fclayer->input_node_num = inputnum;
 	fclayer->output_node_num = outputnum;
-	fclayer->layer_w_tensor = create_tensor(1,inputnum,outputnum,random1,grad);
-	fclayer->layer_b_tensor = create_tensor(1,1,outputnum,random1,grad);
 
 	fclayer->layer_w_tensor = create_tensor_from_twodim_arr(inputnum,outputnum,grad,paramsw);
 	fclayer->layer_b_tensor = create_tensor_from_twodim_arr(1,outputnum,grad,paramsb);
@@ -131,6 +131,7 @@ void add_conv2d_layer(net_handle NET,unsigned int Cin,unsigned int kernelnum,uns
 		printf("net not init!(add_conv2d_layer)\r\n");
 		return;
 	}
+	if (!Cin || !kernelnum || !kernelsize || !stride) return;
 	CONV2D* conv2dlayer = (CONV2D*)malloc(sizeof(CONV2D));
 	layer_list* node = (layer_list*)malloc(sizeof(layer_list));
 	conv2dlayer->type = conv2d;
@@ -190,6 +191,7 @@ void add_pool_layer(net_handle NET,unsigned int poolsize)
 		printf("net not init!(add_pool_layer)\r\n");
 		return;
 	}
+	if (!poolsize) return;
 	POOL* poollayer = (POOL*)malloc(sizeof(POOL));
 	layer_list* node = (layer_list*)malloc(sizeof(layer_list));
 	poollayer->type = pool;
@@ -259,6 +261,7 @@ void add_flatten_layer(net_handle NET)
 
 tensor_handle fc_forward(FC* layer,tensor_handle input)
 {
+	if (!layer || !input || input->dim != 1 || input->h != 1 || input->w != layer->input_node_num) return NULL;
 	tensor* mid = tensor_matrix_mul(input,layer->layer_w_tensor);
 	tensor* ret = tensor_per_val_sum(mid,layer->layer_b_tensor);
 	remove_tensor(mid);
@@ -267,7 +270,10 @@ tensor_handle fc_forward(FC* layer,tensor_handle input)
 
 tensor_handle conv2d_forward(CONV2D* layer,tensor_handle input)
 {
-	unsigned int Cin = input->dim;
+	if (!layer || !input || input->dim != layer->Cin || !layer->stride || !layer->kernel_size ||
+        layer->padding > (UINT_MAX-input->h)/2 || layer->padding > (UINT_MAX-input->w)/2 ||
+        input->h + 2*layer->padding < layer->kernel_size || input->w + 2*layer->padding < layer->kernel_size) return NULL;
+    unsigned int Cin = input->dim;
 	unsigned int ksize = layer->kernel_size;
 	unsigned int str = layer->stride;
 	unsigned int pad = layer->padding;
@@ -322,6 +328,7 @@ tensor_handle conv2d_forward(CONV2D* layer,tensor_handle input)
 
 tensor_handle pool_forward(POOL* layer,tensor_handle input)
 {
+	if (!layer || !input || !layer->polsize || input->h < layer->polsize || input->w < layer->polsize) return NULL;
 	unsigned int dim = input->dim;
 	unsigned int in_h = input->h;
 	unsigned int in_w = input->w;
@@ -377,6 +384,10 @@ void forward(net_handle NET,tensor_handle input)
 		return;
 	}
 	layer_list* p = NET->layer_fount;
+    for (layer_list *q=p; q; q=q->next) {
+        q->output=remove_tensor(q->output); q->actioutput=remove_tensor(q->actioutput); q->input=NULL;
+    }
+    if (!input) return;
 	while(p!=NULL)
 	{
 		p->input = p->pre == NULL?input:p->pre->FUN!=NULL?p->pre->actioutput:p->pre->output;
@@ -401,6 +412,7 @@ void forward(net_handle NET,tensor_handle input)
 			//TODO
 			break;
 		}
+		if (!p->output) return;
 		if(p->FUN != NULL)
 		{
 			if(p->actioutput != NULL)p->actioutput = remove_tensor(p->actioutput);
@@ -412,7 +424,7 @@ void forward(net_handle NET,tensor_handle input)
 
 float compute_lose(net_handle NET,lose_func FUN,tensor_handle ture_val)
 {
-	if(NET == NULL)
+	if(NET == NULL || !NET->layer_tail || !NET->layer_tail->output)
 	{
 		printf("net not init!(compute_lose)\r\n");
 		return -1.0;
@@ -427,8 +439,9 @@ tensor_handle fc_backward(FC* layer, tensor* output_grad, tensor* input)
 	tensor* input_T = tensor_T(input);
 	tensor* w_grad = tensor_matrix_mul(input_T, output_grad);
 	
-	tensor_to_grad(layer->layer_w_tensor,w_grad);
-	tensor_to_grad(layer->layer_b_tensor,output_grad);
+	/* 累加各样本梯度，供 mini-batch 更新使用。 */
+	tensor_sum_to_grad(layer->layer_w_tensor,w_grad);
+	tensor_sum_to_grad(layer->layer_b_tensor,output_grad);
 	
 	tensor* w_T = tensor_T(layer->layer_w_tensor);
 	tensor* input_grad = tensor_matrix_mul(output_grad, w_T);
@@ -550,7 +563,7 @@ tensor_handle flatten_backward(tensor_handle delta, tensor_handle input)
 
 void backward(net_handle NET, lose_func_d FUN, tensor_handle tureval)
 {
-	if(NET == NULL)
+	if(NET == NULL || !NET->layer_tail || !NET->layer_tail->output)
 	{
 		printf("net not init!(backward)\r\n");
 		return;
@@ -703,8 +716,35 @@ void net_zero_grad(net_handle NET)
 	layer_list* p = NET->layer_fount;
 	while(p!=NULL)
 	{
-		tensor_zero_grad(p->data.fclayer->layer_w_tensor);
-		tensor_zero_grad(p->data.fclayer->layer_b_tensor);
+        switch (p->type) {
+        case fc: tensor_zero_grad(p->data.fclayer->layer_w_tensor); tensor_zero_grad(p->data.fclayer->layer_b_tensor); break;
+        case conv2d:
+            tensor_zero_grad(p->data.conv2dlayer->kernel_w);
+            if (p->data.conv2dlayer->kernel_b) tensor_zero_grad(p->data.conv2dlayer->kernel_b);
+            break;
+        default: break;
+        }
 		p = p->next;
 	}
+}
+
+/* Parameters and caches are owned; inputs are borrowed. */
+net_handle remove_net(net_handle NET)
+{
+    if (!NET) return NULL;
+    layer_list *p=NET->layer_fount;
+    while(p) {
+        layer_list *next=p->next;
+        remove_tensor(p->output); remove_tensor(p->actioutput);
+        switch(p->type) {
+        case fc:
+            remove_tensor(p->data.fclayer->layer_w_tensor); remove_tensor(p->data.fclayer->layer_b_tensor); free(p->data.fclayer); break;
+        case conv2d:
+            remove_tensor(p->data.conv2dlayer->kernel_w); remove_tensor(p->data.conv2dlayer->kernel_b); free(p->data.conv2dlayer); break;
+        case pool: remove_tensor(p->data.poollayer->mask); free(p->data.poollayer); break;
+        case flatten: free(p->data.flattenlayer); break;
+        }
+        free(p); p=next;
+    }
+    free(NET); return NULL;
 }
