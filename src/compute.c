@@ -38,6 +38,25 @@ tensor_handle tensor_relu_grad(tensor_handle grad, tensor_handle output)
 	return out;
 }
 
+tensor_handle tensor_tanh(tensor_handle t)
+{
+	tensor_handle out = create_tensor(t->dim, t->h, t->w, zero, t->req_grad);
+	for (int i = 0; i < t->dim * t->h * t->w; i++) {
+		out->Data[i] = tanhf(t->Data[i]);
+	}
+	return out;
+}
+
+tensor_handle tensor_tanh_grad(tensor_handle grad, tensor_handle output)
+{
+	tensor_handle out = create_tensor(grad->dim, grad->h, grad->w, zero, grad->req_grad);
+	for (int i = 0; i < grad->dim * grad->h * grad->w; i++) {
+		float s = tanhf(output->Data[i]); /* s = tanh(激活前的 x) */
+		out->Data[i] = grad->Data[i] * (1.0f - s * s);
+	}
+	return out;
+}
+
 // MSE 均方误差损失函数：0.5 * sum(output - true)²
 float MSE(tensor_handle outputval, tensor_handle trueval)
 {
