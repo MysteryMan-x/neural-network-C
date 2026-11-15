@@ -7,7 +7,8 @@ typedef enum actifun_type
 {
 	relu = 1,
 	sigmoid,
-	none
+	none,
+	tanh_act
 }actifun_type;
 
 typedef tensor_handle (*active_func)(tensor_handle);
