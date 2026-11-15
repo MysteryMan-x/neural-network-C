@@ -41,6 +41,10 @@ void add_fc_layer(net_handle NET,unsigned int inputnum,unsigned int outputnum,ac
 			node->FUN = tensor_sigmoid;
 			node->dFUN = tensor_sigmoid_grad;
 			break;
+		case tanh_act:
+			node->FUN = tensor_tanh;
+			node->dFUN = tensor_tanh_grad;
+			break;
 		case none:
 			node->FUN = NULL;
 			node->dFUN = NULL;
@@ -97,6 +101,10 @@ void add_fc_layer_with_params(net_handle NET,unsigned int inputnum,unsigned int 
 		case sigmoid:
 			node->FUN = tensor_sigmoid;
 			node->dFUN = tensor_sigmoid_grad;
+			break;
+		case tanh_act:
+			node->FUN = tensor_tanh;
+			node->dFUN = tensor_tanh_grad;
 			break;
 		case none:
 			node->FUN = NULL;
@@ -157,6 +165,10 @@ void add_conv2d_layer(net_handle NET,unsigned int Cin,unsigned int kernelnum,uns
 	case sigmoid:
 		node->FUN = tensor_sigmoid;
 		node->dFUN = tensor_sigmoid_grad;
+		break;
+	case tanh_act:
+		node->FUN = tensor_tanh;
+		node->dFUN = tensor_tanh_grad;
 		break;
 	case none:
 		node->FUN = NULL;
