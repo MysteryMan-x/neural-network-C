@@ -19,6 +19,8 @@ tensor_handle tensor_sigmoid(tensor_handle t);
 tensor_handle tensor_sigmoid_grad(tensor_handle grad, tensor_handle output);
 tensor_handle tensor_relu(tensor_handle t);
 tensor_handle tensor_relu_grad(tensor_handle grad, tensor_handle output);
+tensor_handle tensor_tanh(tensor_handle t);
+tensor_handle tensor_tanh_grad(tensor_handle grad, tensor_handle output);
 
 float MSE(tensor_handle outputval,tensor_handle tureval);
 tensor_handle MSE_d(tensor_handle outputval, tensor_handle trueval);
